@@ -5,14 +5,21 @@ using MQTTnet.Client.Connecting;
 using MQTTnet.Client.Disconnecting;
 using MQTTnet.Client.Options;
 using MQTTnet.Client.Receiving;
+using MQTTnet.Client.Subscribing;
 using MQTTnet.Extensions.ManagedClient;
+using Newtonsoft.Json;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+
 
 namespace MQTTFirstLook.clientSub;
 
      public class SubscribeManager
     {
     private readonly IManagedMqttClient _mqttClient; 
+    private List<MqttTopicFilter> _topics;
         public SubscribeManager()
             {
                 _mqttClient = new MqttFactory().CreateManagedMqttClient();
@@ -20,6 +27,7 @@ namespace MQTTFirstLook.clientSub;
                 _mqttClient.DisconnectedHandler = new MqttClientDisconnectedHandlerDelegate(OnDisconnected);
                 _mqttClient.ConnectingFailedHandler = new ConnectingFailedHandlerDelegate(OnConnectingFailed);
                 _mqttClient.ApplicationMessageReceivedHandler = new MqttApplicationMessageReceivedHandlerDelegate(OnMessageReceived);
+                _topics = new List<MqttTopicFilter>();
 
     }
 
@@ -47,8 +55,10 @@ namespace MQTTFirstLook.clientSub;
 
       public async Task SubscribeToTopic(string topic)
         {
-        
-          await _mqttClient.SubscribeAsync(topic);
+
+        _topics.Add(new MqttTopicFilter { Topic = topic });
+        await _mqttClient.SubscribeAsync(_topics);
+          //await _mqttClient.SubscribeAsync(topic);
            Task.Delay(1000).GetAwaiter().GetResult();
         }
 
@@ -57,7 +67,7 @@ namespace MQTTFirstLook.clientSub;
     static void OnConnected(MqttClientConnectedEventArgs obj)
     {
 
-        Console.WriteLine("Subscriber Successfully connected.");
+        Console.WriteLine("Subscriber successfully connected.");
     }
 
     static void OnConnectingFailed(ManagedProcessFailedEventArgs obj)
@@ -73,7 +83,20 @@ namespace MQTTFirstLook.clientSub;
 
     static void OnMessageReceived(MqttApplicationMessageReceivedEventArgs obj)
     {
-        Console.WriteLine($"recived message from: {obj.ClientId}, topic: {obj.ApplicationMessage.Topic}, payload {Encoding.UTF8.GetString(obj.ApplicationMessage.Payload)},Time: {DateTime.Now}");
+        if (obj.ApplicationMessage.Topic.Contains("json"))
+        {
+            var payload = Encoding.UTF8.GetString(obj.ApplicationMessage.Payload);
+            var customerData = System.Text.Json.JsonSerializer.Deserialize<CustomerData>(payload);
+            Console.WriteLine($"recived message from: {obj.ClientId}, topic: {obj.ApplicationMessage.Topic}, console content:{customerData?.ConsoleContent},Time: {customerData?.IssuedDate}");
+
+            //responed to the broker 
+            obj.ReasonCode = MqttApplicationMessageReceivedReasonCode.Success;
+
+        }
+        else if (obj.ApplicationMessage.Topic.Contains("newClient"))
+        {
+            Console.WriteLine($"Message from broker : {Encoding.UTF8.GetString(obj.ApplicationMessage.Payload)}");
+        }
     }
 
 

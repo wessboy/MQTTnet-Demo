@@ -46,10 +46,19 @@ namespace MQTTFirstLook.Client;
         }
 
         public async Task PublishToTopic(string topic,string payload)
-        {
-            string json = JsonConvert.SerializeObject(new { message = payload, sent = DateTimeOffset.UtcNow });
+    {
+        CustomerData customerData = new CustomerData { ConsoleContent = payload, IssuedDate = DateTime.Now };
 
-            await _mqttClient.PublishAsync(topic, json);
+        string json = JsonConvert.SerializeObject(customerData);
+         
+          var message = new MqttApplicationMessageBuilder()
+                            .WithTopic(topic)
+                            .WithPayload(json)
+                            .WithAtLeastOnceQoS()
+                            .WithContentType("application/json")
+                            .Build();
+        await _mqttClient.PublishAsync(message);
+        //await _mqttClient.PublishAsync(topic, json);
             Task.Delay(1000).GetAwaiter().GetResult();
         }
         
